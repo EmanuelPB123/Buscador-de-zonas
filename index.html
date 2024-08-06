@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/jfif" href="/descarga.jfif">
+    <title>Analizar Zonas en Comodoro Rivadavia</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-image: url(descarga\ \(1\).jfif);
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+        textarea {
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            height: 200px;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #resultado {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #e7f3fe;
+            border: 1px solid #b6d4fe;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Analizar Zonas en Comodoro Rivadavia</h1>
+        <form id="zonaForm">
+            <label for="direcciones">Pega aquí los nombres de las calles (una por línea):</label>
+            <textarea id="direcciones" name="direcciones" required></textarea>
+            <button type="submit">Analizar Zonas</button>
+        </form>
+        <div id="resultado"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('zonaForm');
+        const direccionesInput = document.getElementById('direcciones');
+        const resultadoDiv = document.getElementById('resultado');
+
+        let zonaSurCalles = [];
+
+        async function cargarGeoJSON(archivo) {
+            const response = await fetch(archivo);
+            const data = await response.json();
+            return data;
+        }
+
+        function extraerCalles(geoJSON) {
+            const calles = [];
+            geoJSON.features.forEach(feature => {
+                if (feature.properties && feature.properties.name) {
+                    calles.push(normalizarTexto(feature.properties.name));
+                }
+            });
+            return calles;
+        }
+
+        async function inicializarDatos() {
+            const geoJSONSur = await cargarGeoJSON('zonasur.geojson');
+            zonaSurCalles = extraerCalles(geoJSONSur);
+        }
+
+        function normalizarTexto(texto) {
+            return texto.toLowerCase()
+                .replace(/[áéíóúñ]/g, char => 'aeioun'[['á','é','í','ó','ú','ñ'].indexOf(char)])
+                .replace(/[^a-z0-9]/g, '');
+        }
+
+        function determinarZona(direccion) {
+            const direccionNormalizada = normalizarTexto(direccion);
+            for (let calle of zonaSurCalles) {
+                if (direccionNormalizada.includes(calle)) {
+                    return 'Zona Sur';
+                }
+            }
+            return 'Zona Norte';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const direcciones = direccionesInput.value.trim().split('\n');
+            if (direcciones.length > 0) {
+                resultadoDiv.style.display = 'block';
+                resultadoDiv.textContent = 'Analizando zonas...';
+                
+                if (zonaSurCalles.length === 0) {
+                    await inicializarDatos();
+                }
+
+                let zonaSurCount = 0;
+                let zonaNorteCount = 0;
+                let resultados = [];
+
+                direcciones.forEach(direccion => {
+                    direccion = direccion.trim();
+                    if (direccion) {
+                        const zona = determinarZona(direccion);
+                        if (zona === 'Zona Sur') {
+                            zonaSurCount++;
+                        } else {
+                            zonaNorteCount++;
+                        }
+                        resultados.push(`${direccion}: ${zona}`);
+                    }
+                });
+
+                let resumenHTML = `
+                    <h3>Resumen:</h3>
+                    <p>Total de calles analizadas: ${zonaSurCount + zonaNorteCount}</p>
+                    <p>Calles en Zona Sur: ${zonaSurCount}</p>
+                    <p>Calles en Zona Norte: ${zonaNorteCount}</p>
+                    <h3>Resultados detallados:</h3>
+                    <ul>
+                        ${resultados.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                `;
+
+                resultadoDiv.innerHTML = resumenHTML;
+            } else {
+                resultadoDiv.textContent = 'Por favor, ingresa al menos una calle.';
+            }
+        });
+
+        // Cargar los datos del archivo GeoJSON al iniciar la página
+        inicializarDatos();
+    </script>
+</body>
+</html>
